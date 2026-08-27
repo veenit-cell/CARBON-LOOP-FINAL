@@ -16,7 +16,6 @@ const syntheticFactor = {
   geography: "SYNTHETIC_TEST_ONLY",
   methodologyVersion: "SYNTHETIC_TEST_ONLY",
   effectiveFrom: "2026-01-01",
-  status: "draft",
   qualityLabel: "SYNTHETIC_TEST_ONLY",
   uncertainty: "SYNTHETIC_TEST_ONLY",
   createdAt: "2026-01-01T00:00:00.000Z",

@@ -37,7 +37,6 @@ export const factorVersionSchema = z
     methodologyVersion: requiredStringSchema,
     effectiveFrom: effectiveDateSchema,
     effectiveTo: effectiveDateSchema.optional(),
-    status: z.enum(["draft", "approved", "retired"]),
     qualityLabel: requiredStringSchema,
     uncertainty: requiredStringSchema,
     createdAt: isoTimestampSchema,
