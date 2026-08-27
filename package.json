@@ -5,7 +5,8 @@
   "type": "module",
   "workspaces": [
     "apps/web",
-    "packages/schemas"
+    "packages/schemas",
+    "packages/factor-registry"
   ],
   "scripts": {
     "dev": "npm --workspace=@carbonloop/web run dev",
