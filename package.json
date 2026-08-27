@@ -1,0 +1,26 @@
+{
+  "name": "carbonloop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm --workspace=@carbonloop/web run dev",
+    "build": "npm --workspace=@carbonloop/web run build",
+    "start": "npm --workspace=@carbonloop/web run start",
+    "lint": "npm --workspace=@carbonloop/web run lint",
+    "format": "npm --workspace=@carbonloop/web run format",
+    "format:check": "npm --workspace=@carbonloop/web run format:check",
+    "typecheck": "npm --workspace=@carbonloop/web run typecheck",
+    "test": "vitest run --config vitest.config.ts",
+    "test:watch": "vitest --config vitest.config.ts",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "latest",
+    "@vitest/coverage-v8": "latest",
+    "vitest": "latest"
+  }
+}
