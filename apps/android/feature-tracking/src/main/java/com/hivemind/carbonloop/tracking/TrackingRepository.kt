@@ -1,0 +1,2 @@
+package com.hivemind.carbonloop.tracking
+interface TrackingRepository

@@ -14,3 +14,4 @@ apps/android/**/.gradle/
 **/local.properties
 *.jks
 *.keystore
+.gradle/

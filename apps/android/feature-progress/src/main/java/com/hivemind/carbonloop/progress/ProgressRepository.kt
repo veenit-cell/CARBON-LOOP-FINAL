@@ -1,0 +1,2 @@
+package com.hivemind.carbonloop.progress
+interface ProgressRepository
