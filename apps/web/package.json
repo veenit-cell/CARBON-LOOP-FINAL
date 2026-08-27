@@ -10,7 +10,8 @@
     "lint": "eslint app lib next.config.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check app components lib package.json tsconfig.json next-env.d.ts next.config.ts postcss.config.mjs eslint.config.mjs prettier.config.mjs components.json",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "npm --prefix ../.. test"
   },
   "dependencies": {
     "@radix-ui/react-slot": "latest",

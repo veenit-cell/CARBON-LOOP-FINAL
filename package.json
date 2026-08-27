@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "apps/web"
+    "apps/web",
+    "packages/schemas"
   ],
   "scripts": {
     "dev": "npm --workspace=@carbonloop/web run dev",
