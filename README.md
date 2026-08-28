@@ -1,65 +1,46 @@
-# CarbonLoop
+# CarbonLoop hackathon MVP
 
-CarbonLoop is an evidence-backed campus decarbonization platform. This repository currently contains the engineering foundation only; no CarbonLoop business workflows, Supabase schema, API endpoints, or real data processing are implemented.
+CarbonLoop is a synthetic, browser-playable sustainability-game demonstration. It uses deterministic demo data and is **not production-ready**.
 
 ## Prerequisites
 
-- Windows 10 or 11
-- Node.js 22 LTS or later — **NEEDS_VERIFICATION** for the team's final supported version
-- npm 10 or later — **NEEDS_VERIFICATION** for the team's final supported version
+- Node.js 22 LTS and npm 10 (team versions: **NEEDS_VERIFICATION**)
+- Android Studio/JDK only for Android validation (**NEEDS_VERIFICATION**)
 
-## Windows setup
+## Install and run
 
-1. Open PowerShell in the repository root.
-2. Install dependencies:
+```powershell
+npm install
+npm run dev
+```
 
-   ```powershell
-   npm install
-   ```
+Open [http://localhost:3000](http://localhost:3000): `/` is the landing page, `/demo` is the player journey, `/dashboard` is the privacy-safe aggregate view, and `/api/v1/health` is the demo health check.
 
-3. Create your local environment file:
+Production mode:
 
-   ```powershell
-   Copy-Item .env.example .env.local
-   ```
+```powershell
+npm run build
+npm run start
+```
 
-4. Start the development server:
+## Judge flow (3–5 minutes)
 
-   ```powershell
-   npm run dev
-   ```
+1. Open `/`, then choose **Start Your Mission**.
+2. On `/demo`, note the compact Hackathon Demo, Synthetic Data, Simulated Evidence, and Mock Reward labels.
+3. Complete **Walk to Campus**, then show Eco XP, Green Points, and avoided CO2e separately in the completion view.
+4. Open Rewards and redeem the mock reward; no payment, delivery, cash, carbon credit, or offset occurs.
+5. Demonstrate one simulated shuttle check-in, then open `/dashboard` to see a privacy-safe synthetic aggregate.
+6. Use **Reset Demo** and repeat from its deterministic seeded state.
 
-5. Open [http://localhost:3000](http://localhost:3000). The health check is at [http://localhost:3000/health](http://localhost:3000/health).
+## Limits and Android status
 
-## Checks
+All displayed activity, calculation inputs, evidence, rewards, and aggregate values are synthetic or simulated. No real campus data, movement/location history, payment, institutional approval, or production persistence is represented. The process-local reset endpoint is demo-only. Android source is present; device/runtime compatibility is **NEEDS_VERIFICATION**.
+
+## Verification
 
 ```powershell
 npm run lint
-npm run format:check
 npm run typecheck
 npm test
-npm run test:e2e
+npm run build
 ```
-
-## Environment variables
-
-Only non-secret public development defaults are included in `.env.example`:
-
-- `NEXT_PUBLIC_APP_ENV`
-- `NEXT_PUBLIC_APP_URL`
-
-Environment values are validated with Zod in `lib/env.ts`. Do not add real credentials, Supabase service-role keys, or personal data to example files or source control.
-
-## Project structure
-
-- `app/` — Next.js application shell and health page
-- `modules/` — domain-module boundaries; intentionally empty in this stage
-- `adapters/` — future replaceable provider adapters
-- `jobs/` — future PostgreSQL-backed background work
-- `supabase/` — future Supabase configuration and migrations
-- `tests/` — unit and end-to-end tests
-- `docs/` — project methodology and decision records
-
-## Current scope
-
-The internally accepted hackathon scope is campus-shuttle transport as the primary vertical slice and electricity-bill capture as the secondary flow. Real campus parameters, factors, issuers, and approval remain `NEEDS_VERIFICATION`. See `docs/decisions/ADR-0001-mvp-scope-and-pilot-boundary.md`.
