@@ -15,3 +15,5 @@ apps/android/**/.gradle/
 *.jks
 *.keystore
 .gradle/
+
+/apps/android/.idea/

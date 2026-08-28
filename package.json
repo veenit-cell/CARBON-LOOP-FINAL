@@ -7,7 +7,10 @@
     "apps/web",
     "packages/schemas",
     "packages/carbon-engine",
-    "packages/factor-registry"
+    "packages/factor-registry",
+    "packages/quest-engine",
+    "packages/scoring",
+    "packages/marketplace"
   ],
   "scripts": {
     "dev": "npm --workspace=@carbonloop/web run dev",
