@@ -1,0 +1,1 @@
+import { Shell } from "@/components/DemoExperience"; export default function Page(){return <Shell dashboard/>}

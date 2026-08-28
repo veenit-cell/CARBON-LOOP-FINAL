@@ -22,6 +22,8 @@ async function request(path: string, init?: RequestInit) {
   return { response, body: await response.json() };
 }
 
+async function reset(idempotencyKey = crypto.randomUUID()) { return request("/demo/reset", { method: "POST", headers: headers(idempotencyKey), body: "{}" }); }
+
 function headers(idempotencyKey?: string): HeadersInit {
   return {
     "content-type": "application/json",
@@ -46,6 +48,8 @@ beforeAll(async () => {
 afterAll(() => server?.kill());
 
 describe("Fast-Track Batch 3 demo API", () => {
+  it("restores a deterministic demo-only seed", async () => { const before = await request("/scores/ledger"); await request("/quest-runs", { method: "POST", headers: headers("seed-mutation"), body: JSON.stringify({ questTemplateId: "SIMULATED_DEMO_ONLY_walk_quest" }) }); const result = await reset("seed-reset"); const after = await request("/scores/ledger"); expect(result.body).toMatchObject({ reset: "SIMULATED_DEMO_ONLY", persistence: expect.stringContaining("not production") }); expect(after.body.events).toEqual(before.body.events); expectTruthLabels(result.body); });
+  it("makes repeated demo resets idempotent", async () => { await reset("repeat-reset"); await request("/quest-runs", { method: "POST", headers: headers("repeat-mutation"), body: JSON.stringify({ questTemplateId: "SIMULATED_DEMO_ONLY_walk_quest" }) }); const repeated = await reset("repeat-reset"); const ledger = await request("/scores/ledger"); expect(repeated.response.status).toBe(200); expect(ledger.body.events).toHaveLength(1); });
   it("returns labelled deterministic demo health and quests", async () => {
     const health = await request("/health");
     const quests = await request("/quests");
