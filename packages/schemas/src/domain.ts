@@ -27,4 +27,23 @@ export const progressionSchema = z.object({ level: z.number().int().nonnegative(
 export const rewardCatalogueItemSchema = z.object({ rewardItemId: opaqueIdSchema, title: z.string().min(1), status: z.enum(["active", "unavailable", "retired"]) });
 export const redemptionRequestSchema = z.object({ rewardItemId: opaqueIdSchema, requestId: requestIdSchema, status: z.enum(["requested", "reserved", "fulfilled", "reversed", "rejected"]) });
 export const truthLabelSchema = z.enum(["seeded", "simulated", "projected", "observed", "verified"]);
+export const carbonDataLabelSchema = z.enum(["SYNTHETIC_TEST_ONLY", "NEEDS_VERIFICATION"]);
+export const baselineKindSchema = z.enum(["personal_declared", "institutional_measured", "seeded_demonstration", "projected_scenario"]);
+export const baselineSchema = z.object({
+  baselineId: opaqueIdSchema,
+  kind: baselineKindSchema,
+  quantity: z.string().regex(/^\d+(?:\.\d+)?$/),
+  unit: z.string().trim().min(1),
+  dataLabel: carbonDataLabelSchema,
+  declaredAt: isoTimestampSchema,
+  displacedMotorizedBaseline: z.boolean(),
+  truthLabels: z.array(truthLabelSchema).min(1),
+}).superRefine((baseline, context) => {
+  if (baseline.kind === "seeded_demonstration" && !baseline.truthLabels.includes("seeded")) {
+    context.addIssue({ code: "custom", path: ["truthLabels"], message: "Seeded baselines require the seeded truth label" });
+  }
+  if (baseline.kind === "projected_scenario" && !baseline.truthLabels.includes("projected")) {
+    context.addIssue({ code: "custom", path: ["truthLabels"], message: "Projected baselines require the projected truth label" });
+  }
+});
 export const institutionalAggregateSchema = z.object({ campusId: opaqueIdSchema, metricPeriodStart: isoTimestampSchema, metricPeriodEnd: isoTimestampSchema, privacyThresholdApplied: z.boolean(), truthLabels: z.array(truthLabelSchema).min(1), evidenceQuality: z.record(evidenceTierSchema, z.number().int().nonnegative()), metrics: z.record(z.string(), z.number()) });

@@ -6,6 +6,7 @@
   "workspaces": [
     "apps/web",
     "packages/schemas",
+    "packages/carbon-engine",
     "packages/factor-registry"
   ],
   "scripts": {

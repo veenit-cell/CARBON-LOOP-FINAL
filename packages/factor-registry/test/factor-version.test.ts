@@ -10,6 +10,7 @@ const syntheticFactor = {
   quantityUnit: "SYNTHETIC_TEST_ONLY",
   factorUnit: "SYNTHETIC_TEST_ONLY",
   decimalValue: SYNTHETIC_TEST_ONLY_DECIMAL_VALUE,
+  dataLabel: "SYNTHETIC_TEST_ONLY",
   sourceTitle: "SYNTHETIC_TEST_ONLY",
   sourcePublisher: "SYNTHETIC_TEST_ONLY",
   sourceReference: "SYNTHETIC_TEST_ONLY",

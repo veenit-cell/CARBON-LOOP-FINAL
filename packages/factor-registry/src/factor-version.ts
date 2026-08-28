@@ -2,6 +2,7 @@ import { z } from "zod";
 import { isoTimestampSchema, opaqueIdSchema } from "@carbonloop/schemas";
 
 const requiredStringSchema = z.string().trim().min(1);
+export const factorDataLabelSchema = z.enum(["SYNTHETIC_TEST_ONLY", "NEEDS_VERIFICATION"]);
 const effectiveDateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -34,6 +35,7 @@ export const factorVersionSchema = z
     sourcePublisher: requiredStringSchema,
     sourceReference: requiredStringSchema,
     geography: requiredStringSchema,
+    dataLabel: factorDataLabelSchema,
     methodologyVersion: requiredStringSchema,
     effectiveFrom: effectiveDateSchema,
     effectiveTo: effectiveDateSchema.optional(),
