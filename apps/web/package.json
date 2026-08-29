@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
+    "//prebuild": "The `@carbonloop/*` exports maps point at ./dist, which is gitignored. Hosts that treat apps/web as the root directory (Vercel does) run this script's `build` directly, so the repo-root prebuild never fires and every workspace import fails to resolve on a fresh clone. Hooking it here covers both entry points.",
+    "prebuild": "npm run build:packages --prefix ../..",
     "build": "next build",
     "start": "next start",
     "lint": "eslint app components lib next.config.ts",
