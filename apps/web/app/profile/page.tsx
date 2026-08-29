@@ -3,7 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import {
+  Activity,
   Award,
+  CheckCircle2,
   Flame,
   Leaf,
   LogOut,
@@ -19,7 +21,12 @@ import { useAuth } from "@/lib/auth-context";
 import { AppNav } from "@/app/dashboard/page";
 
 type ProfileData = {
-  profile: { displayName: string; email: string; preferences: { notifications: boolean; darkMode: boolean } };
+  profile: {
+    displayName: string;
+    email: string;
+    preferences: { notifications: boolean; darkMode: boolean };
+    googleHealth?: { connected: boolean; connectedAt?: string; scope?: string };
+  };
   stats: {
     level: number;
     levelTitle: string;
@@ -115,6 +122,37 @@ export default function ProfilePage() {
               <p>Completed</p>
             </div>
           </dl>
+        </section>
+
+        {/* Google Health Integration */}
+        <section className="block">
+          <h2 className="block-title"><Activity size={18} /> Google Health & Fitness</h2>
+          <p className="muted">
+            Connect Google Health to sync your step counts and activity data directly into CarbonLoop missions.
+          </p>
+          <div style={{ marginTop: 14 }}>
+            {profile.profile.googleHealth?.connected ? (
+              <div className="achievement earned" style={{ opacity: 1, padding: "14px 16px" }}>
+                <CheckCircle2 size={24} style={{ color: "var(--secondary)" }} />
+                <div>
+                  <p className="achievement-title" style={{ color: "var(--secondary)", fontSize: 14 }}>
+                    Google Health Connected
+                  </p>
+                  <p className="achievement-desc">
+                    Scope: Activity/Fitness Read ({profile.profile.googleHealth.scope || "https://www.googleapis.com/auth/fitness.activity.read"})
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <a
+                href="/api/auth/google"
+                className="primary"
+                style={{ display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none", width: "auto" }}
+              >
+                <Activity size={16} /> Connect Google Health
+              </a>
+            )}
+          </div>
         </section>
 
         {/* Badges */}

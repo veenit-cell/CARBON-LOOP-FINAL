@@ -1,28 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
+import { saveGoogleHealthConnection } from "@/lib/db";
 
 /**
- * Google OAuth / Google Health Callback Route
+ * Google Health API OAuth 2.0 Callback Route
  *
- * Exact Redirect URI to register in Google Cloud Console:
+ * Exact Redirect URI registered in Google Cloud:
  * http://localhost:3000/api/auth/callback/google
- * (or https://<your-domain>/api/auth/callback/google in production)
+ *
+ * Server-side exchange of code for tokens. Never exposes client secret.
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   const error = searchParams.get("error");
-  const scope = searchParams.get("scope");
+  const scope = searchParams.get("scope") || "https://www.googleapis.com/auth/fitness.activity.read";
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const redirectUri = `${baseUrl}/api/auth/callback/google`;
 
-  // Check user session (if logged in)
+  // Authenticated user session check
   const user = await getSessionUser();
 
   if (error) {
     return NextResponse.redirect(
-      new URL(`/dashboard?google_health=error&reason=${encodeURIComponent(error)}`, baseUrl),
+      new URL(`/profile?google_health=error&reason=${encodeURIComponent(error)}`, baseUrl),
     );
   }
 
@@ -30,8 +32,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         status: "error",
-        message: "No authorization code provided in Google OAuth callback.",
+        message: "No authorization code provided in Google Health OAuth callback.",
         registeredCallbackUrl: redirectUri,
+        requiredScope: "https://www.googleapis.com/auth/fitness.activity.read",
       },
       { status: 400 },
     );
@@ -40,12 +43,17 @@ export async function GET(request: NextRequest) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
-  let tokenData = null;
-  let tokenError = null;
+  let tokenData: {
+    access_token?: string;
+    refresh_token?: string;
+    expires_in?: number;
+    scope?: string;
+  } | null = null;
+  let tokenError: string | null = null;
 
   if (clientId && clientSecret) {
     try {
-      const response = await fetch("https://oauth2.googleapis.com/token", {
+      const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
@@ -57,10 +65,10 @@ export async function GET(request: NextRequest) {
         }),
       });
 
-      if (response.ok) {
-        tokenData = await response.json();
+      if (tokenResponse.ok) {
+        tokenData = await tokenResponse.json();
       } else {
-        const errJson = await response.json().catch(() => ({}));
+        const errJson = await tokenResponse.json().catch(() => ({}));
         tokenError = errJson.error_description || "Failed to exchange authorization code for tokens.";
       }
     } catch (err) {
@@ -68,13 +76,25 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Redirect back to dashboard with status parameters
-  const redirectUrl = new URL("/dashboard", baseUrl);
+  // Save connection status for user in database (if authenticated)
+  if (user) {
+    saveGoogleHealthConnection(user.id, {
+      accessToken: tokenData?.access_token,
+      refreshToken: tokenData?.refresh_token,
+      expiresIn: tokenData?.expires_in,
+      scope: tokenData?.scope || scope,
+    });
+  }
+
+  // Redirect to profile page with connection success/status
+  const redirectUrl = new URL("/profile", baseUrl);
   redirectUrl.searchParams.set("google_health", "connected");
-  if (scope) redirectUrl.searchParams.set("scope", scope);
-  if (user) redirectUrl.searchParams.set("user", user.id);
-  if (tokenError) redirectUrl.searchParams.set("token_error", tokenError);
-  if (!clientId || !clientSecret) redirectUrl.searchParams.set("note", "NEEDS_CONFIGURATION_ENV_KEYS");
+  if (tokenError) {
+    redirectUrl.searchParams.set("token_error", tokenError);
+  }
+  if (!clientId || !clientSecret) {
+    redirectUrl.searchParams.set("note", "NEEDS_CONFIGURATION_ENV_KEYS");
+  }
 
   return NextResponse.redirect(redirectUrl);
 }

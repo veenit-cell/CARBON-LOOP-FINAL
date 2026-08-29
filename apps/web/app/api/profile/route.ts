@@ -25,8 +25,16 @@ export async function GET() {
     { id: "first_redeem", title: "Redeemer", description: "Redeem your first reward", earned: state.redemptions.length >= 1 },
   ];
 
+  const safeGoogleHealth = profile?.googleHealth
+    ? {
+        connected: profile.googleHealth.connected,
+        connectedAt: profile.googleHealth.connectedAt,
+        scope: profile.googleHealth.scope,
+      }
+    : { connected: false };
+
   return Response.json({
-    profile: profile ?? { displayName: auth.user.name, email: auth.user.email },
+    profile: profile ? { ...profile, googleHealth: safeGoogleHealth } : { displayName: auth.user.name, email: auth.user.email, googleHealth: safeGoogleHealth },
     stats: {
       level: derived.level,
       levelTitle: derived.levelTitle,
@@ -56,7 +64,7 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const parsed = updateSchema.safeParse(body);
     if (!parsed.success) {
-      return Response.json({ code: "VALIDATION_ERROR", message: parsed.error.errors[0]?.message }, { status: 400 });
+      return Response.json({ code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message }, { status: 400 });
     }
     const updated = updateProfile(auth.user.id, parsed.data);
     return Response.json({ profile: updated });

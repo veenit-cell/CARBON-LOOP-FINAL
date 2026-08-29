@@ -66,6 +66,14 @@ export type UserProfile = {
     notifications: boolean;
     darkMode: boolean;
   };
+  googleHealth?: {
+    connected: boolean;
+    connectedAt?: string;
+    accessToken?: string;
+    refreshToken?: string;
+    expiresAt?: string;
+    scope?: string;
+  };
 };
 
 type UsersStore = { users: User[] };
@@ -128,15 +136,64 @@ export function getProfile(userId: string): UserProfile | undefined {
   return store.profiles.find((p) => p.userId === userId);
 }
 
-export function updateProfile(userId: string, updates: Partial<Pick<UserProfile, "displayName" | "preferences">>): UserProfile | undefined {
+export function updateProfile(
+  userId: string,
+  updates: {
+    displayName?: string;
+    preferences?: { notifications?: boolean; darkMode?: boolean };
+    googleHealth?: Partial<NonNullable<UserProfile["googleHealth"]>>;
+  },
+): UserProfile | undefined {
   const store = loadStore<ProfilesStore>("profiles", { profiles: [] });
   const index = store.profiles.findIndex((p) => p.userId === userId);
   if (index === -1) return undefined;
   if (updates.displayName !== undefined) store.profiles[index].displayName = updates.displayName;
-  if (updates.preferences !== undefined) store.profiles[index].preferences = { ...store.profiles[index].preferences, ...updates.preferences };
+  if (updates.preferences !== undefined) {
+    store.profiles[index].preferences = {
+      ...store.profiles[index].preferences,
+      ...updates.preferences,
+    };
+  }
+  if (updates.googleHealth !== undefined) {
+    store.profiles[index].googleHealth = {
+      ...store.profiles[index].googleHealth,
+      ...updates.googleHealth,
+      connected: updates.googleHealth.connected ?? store.profiles[index].googleHealth?.connected ?? false,
+    };
+  }
   saveStore("profiles", store);
   return store.profiles[index];
 }
+
+export function saveGoogleHealthConnection(
+  userId: string,
+  tokens: {
+    accessToken?: string;
+    refreshToken?: string;
+    expiresIn?: number;
+    scope?: string;
+  },
+): UserProfile | undefined {
+  const store = loadStore<ProfilesStore>("profiles", { profiles: [] });
+  const index = store.profiles.findIndex((p) => p.userId === userId);
+  if (index === -1) return undefined;
+
+  const now = new Date();
+  const expiresAt = tokens.expiresIn ? new Date(now.getTime() + tokens.expiresIn * 1000).toISOString() : undefined;
+
+  store.profiles[index].googleHealth = {
+    connected: true,
+    connectedAt: now.toISOString(),
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken || store.profiles[index].googleHealth?.refreshToken,
+    expiresAt,
+    scope: tokens.scope || "https://www.googleapis.com/auth/fitness.activity.read",
+  };
+
+  saveStore("profiles", store);
+  return store.profiles[index];
+}
+
 
 // ---------------------------------------------------------------------------
 // Session operations

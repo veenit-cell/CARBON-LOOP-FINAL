@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     const parsed = loginSchema.safeParse(body);
     if (!parsed.success) {
       return Response.json(
-        { code: "VALIDATION_ERROR", message: parsed.error.errors[0]?.message ?? "Invalid input." },
+        { code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message ?? "Invalid input." },
         { status: 400 },
       );
     }
