@@ -1,13 +1,40 @@
 import { requireAuth } from "@/lib/auth";
-import { getGameState } from "@/lib/db";
+import { getGameState, getProfile } from "@/lib/db";
 import { derive, MISSIONS } from "@/lib/game";
 
 export async function GET() {
   const auth = await requireAuth();
   if (!auth.ok) return auth.response;
 
+  const profile = getProfile(auth.user.id);
   const state = getGameState(auth.user.id);
   const derived = derive(state);
+
+  const health = profile?.googleHealth;
+  const googleHealthConnected = !!health?.connected;
+  const lastSyncedAt = health?.lastSyncedAt ?? null;
+  const activityRecordsCount = health?.activityRecordsCount ?? 0;
+  const lastSyncedPeriod = health?.lastSyncedPeriod ?? "Today's Activity";
+
+  // Prevent premature calculation state
+  const trackingStarted = profile?.trackingStarted ?? false;
+  const demoMode = profile?.demoMode ?? false;
+  const carbonCalculated = !!health?.carbonCalculated;
+
+  let trackingState: "NOT_STARTED" | "NOT_CONNECTED" | "CONNECTED_NO_DATA" | "DATA_AVAILABLE" | "CALCULATION_COMPLETE" = "NOT_STARTED";
+  if (!trackingStarted) {
+    trackingState = "NOT_STARTED";
+  } else if (!googleHealthConnected) {
+    trackingState = "NOT_CONNECTED";
+  } else if (!lastSyncedAt || activityRecordsCount === 0) {
+    trackingState = "CONNECTED_NO_DATA";
+  } else if (!carbonCalculated) {
+    trackingState = "DATA_AVAILABLE";
+  } else {
+    trackingState = "CALCULATION_COMPLETE";
+  }
+
+  const showResults = trackingState === "CALCULATION_COMPLETE";
 
   // Carbon saved by time period
   const now = new Date();
@@ -54,15 +81,22 @@ export async function GET() {
     const dayPoints = carbonEvents
       .filter((e) => e.occurredAt.slice(0, 10) === dayStr)
       .reduce((sum, e) => sum + e.amount, 0);
-    return { date: dayStr, label: date.toLocaleDateString("en-US", { weekday: "short" }), carbonKg: dayCarbon, points: dayPoints };
+    return { date: dayStr, label: date.toLocaleDateString("en-US", { weekday: "short" }), carbonKg: showResults ? dayCarbon : 0, points: showResults ? dayPoints : 0 };
   });
 
   return Response.json({
+    trackingState,
+    googleHealthConnected,
+    lastSyncedAt,
+    activityRecordsCount,
+    lastSyncedPeriod,
+    demoMode,
+    dataSource: googleHealthConnected ? (demoMode ? "Simulated Demo Activity" : "Google Health API (Fitness Activity)") : "Not Connected",
     carbon: {
-      today: carbonToday.toFixed(6),
-      week: carbonWeek.toFixed(6),
-      month: carbonMonth.toFixed(6),
-      total: derived.avoidedKgCo2e,
+      today: showResults ? carbonToday.toFixed(6) : "0.000000",
+      week: showResults ? carbonWeek.toFixed(6) : "0.000000",
+      month: showResults ? carbonMonth.toFixed(6) : "0.000000",
+      total: showResults ? derived.avoidedKgCo2e : "0.000000",
     },
     points: {
       available: derived.spendableGreenPoints,

@@ -62,6 +62,8 @@ export type UserProfile = {
   displayName: string;
   email: string;
   createdAt: string;
+  trackingStarted?: boolean;
+  demoMode?: boolean;
   preferences: {
     notifications: boolean;
     darkMode: boolean;
@@ -73,6 +75,10 @@ export type UserProfile = {
     refreshToken?: string;
     expiresAt?: string;
     scope?: string;
+    lastSyncedAt?: string;
+    activityRecordsCount?: number;
+    lastSyncedPeriod?: string;
+    carbonCalculated?: boolean;
   };
 };
 
@@ -117,6 +123,8 @@ export function createUser(email: string, name: string, passwordHash: string): U
     displayName: name,
     email: user.email,
     createdAt: user.createdAt,
+    trackingStarted: false,
+    demoMode: false,
     preferences: { notifications: true, darkMode: true },
   });
   saveStore("profiles", profiles);
@@ -142,6 +150,8 @@ export function updateProfile(
     displayName?: string;
     preferences?: { notifications?: boolean; darkMode?: boolean };
     googleHealth?: Partial<NonNullable<UserProfile["googleHealth"]>>;
+    trackingStarted?: boolean;
+    demoMode?: boolean;
   },
 ): UserProfile | undefined {
   const store = loadStore<ProfilesStore>("profiles", { profiles: [] });
@@ -161,6 +171,8 @@ export function updateProfile(
       connected: updates.googleHealth.connected ?? store.profiles[index].googleHealth?.connected ?? false,
     };
   }
+  if (updates.trackingStarted !== undefined) store.profiles[index].trackingStarted = updates.trackingStarted;
+  if (updates.demoMode !== undefined) store.profiles[index].demoMode = updates.demoMode;
   saveStore("profiles", store);
   return store.profiles[index];
 }
@@ -189,6 +201,47 @@ export function saveGoogleHealthConnection(
     expiresAt,
     scope: tokens.scope || "https://www.googleapis.com/auth/fitness.activity.read",
   };
+
+  saveStore("profiles", store);
+  return store.profiles[index];
+}
+
+export function saveGoogleHealthActivitySync(
+  userId: string,
+  recordsCount: number,
+  period: string = "Today's Activity",
+): UserProfile | undefined {
+  const store = loadStore<ProfilesStore>("profiles", { profiles: [] });
+  const index = store.profiles.findIndex((p) => p.userId === userId);
+  if (index === -1) return undefined;
+
+  const now = new Date().toISOString();
+  if (store.profiles[index].googleHealth) {
+    store.profiles[index].googleHealth = {
+      ...store.profiles[index].googleHealth,
+      connected: true,
+      lastSyncedAt: now,
+      activityRecordsCount: recordsCount,
+      lastSyncedPeriod: period,
+      carbonCalculated: false, // forces new calculation for newly synced data
+    };
+  }
+
+  saveStore("profiles", store);
+  return store.profiles[index];
+}
+
+export function saveGoogleHealthCalculation(userId: string): UserProfile | undefined {
+  const store = loadStore<ProfilesStore>("profiles", { profiles: [] });
+  const index = store.profiles.findIndex((p) => p.userId === userId);
+  if (index === -1) return undefined;
+
+  if (store.profiles[index].googleHealth) {
+    store.profiles[index].googleHealth = {
+      ...store.profiles[index].googleHealth,
+      carbonCalculated: true,
+    };
+  }
 
   saveStore("profiles", store);
   return store.profiles[index];

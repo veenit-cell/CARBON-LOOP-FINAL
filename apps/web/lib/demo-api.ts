@@ -497,3 +497,196 @@ export async function campus() {
     },
   });
 }
+
+const addActivitySchema = z.object({
+  recordId: z.string(),
+  activityType: z.enum(["walking", "cycling", "shuttle"]),
+  distanceKm: z.number().positive(),
+  steps: z.number().nonnegative().optional(),
+  calories: z.number().nonnegative().optional(),
+  durationMinutes: z.number().positive().optional(),
+  occurredAt: z.string().optional(),
+});
+
+export async function addActivity(request: Request) {
+  const parsed = await body(request, addActivitySchema);
+  if (parsed instanceof NextResponse) return parsed;
+  const requestKey = key(request);
+  if (requestKey instanceof NextResponse) return requestKey;
+  const replayed = replay(requestKey);
+  if (replayed !== null) return replayed;
+
+  // Deduplicate
+  if (usedTokens.has(parsed.recordId)) {
+    return remember(requestKey, 200, { ok: true, status: "DUPLICATE", message: "Already processed." });
+  }
+
+  // Find quest template
+  const templateId = parsed.activityType === "cycling" ? "SIMULATED_DEMO_ONLY_cycle_quest" : "SIMULATED_DEMO_ONLY_walk_quest";
+  const mission = findMission(templateId);
+  if (mission === undefined) {
+    return error(request, "QUEST_TEMPLATE_NOT_FOUND", "No matching quest template.", 404);
+  }
+
+  const questRunId = id("SIMULATED_DEMO_ONLY_health_run");
+  const occurredAtTime = parsed.occurredAt || now;
+
+  // Start run
+  const transitionStart = appendQuestTransition([], {
+    eventId: id("quest_event"),
+    questRunId,
+    questType: mission.questType,
+    from: "available",
+    to: "active",
+    occurredAt: occurredAtTime,
+    idempotencyKey: `${parsed.recordId}-start`,
+  });
+  if (transitionStart.status === "rejected") return error(request, "QUEST_TRANSITION_REJECTED", transitionStart.reason, 409);
+
+  // Complete run
+  const transitionComplete = appendQuestTransition(transitionStart.history, {
+    eventId: id("quest_event"),
+    questRunId,
+    questType: mission.questType,
+    from: "active",
+    to: "completed",
+    occurredAt: occurredAtTime,
+    idempotencyKey: `${parsed.recordId}-complete`,
+  });
+  if (transitionComplete.status === "rejected") return error(request, "QUEST_TRANSITION_REJECTED", transitionComplete.reason, 409);
+
+  // Simulate activity & carbon calculation
+  const distanceStr = String(parsed.distanceKm);
+  const activity = simulateActivity({
+    questRunId,
+    occurredAt: occurredAtTime,
+    activityType: mission.activityType,
+    distanceKm: distanceStr,
+  });
+
+  const carbonResult = syntheticCarbon({
+    activityType: mission.activityType as "walking" | "cycling" | "shuttle",
+    distanceKm: distanceStr,
+    evidenceTier: "V2", // V2 tier represents real Android Health Connect verified records
+    calculationId: id("synthetic_calculation"),
+    calculatedAt: occurredAtTime,
+  });
+
+  // Issue XP
+  const xpFailure = appendScore({
+    eventId: id("xp"),
+    questRunId,
+    occurredAt: occurredAtTime,
+    idempotencyKey: `${parsed.recordId}-xp`,
+    type: "eco_xp_issued",
+    amount: mission.ecoXp,
+    mission: { questRunId, questType: mission.questType, state: "completed", completedAt: occurredAtTime },
+  });
+  if (xpFailure !== null) return error(request, "SCORE_REJECTED", xpFailure, 409);
+
+  // Issue points
+  let greenPointsIssued = 0;
+  if (carbonResult.status === "calculated") {
+    const points = greenPointsForAvoidedKgCo2e(carbonResult.avoidedKgCo2e);
+    if (points > 0) {
+      const failure = appendScore({
+        eventId: id("green"),
+        questRunId,
+        occurredAt: occurredAtTime,
+        idempotencyKey: `${parsed.recordId}-green`,
+        type: "green_points_issued",
+        amount: points,
+        calculationId: carbonResult.calculationId,
+        evidenceTier: "V2",
+        activityType: mission.activityType,
+        avoidedKgCo2e: carbonResult.avoidedKgCo2e,
+        carbonResultStatus: "calculated",
+      });
+      if (failure !== null) return error(request, "SCORE_REJECTED", failure, 409);
+      greenPointsIssued = points;
+    }
+  }
+
+  // Update runs
+  runs.set(questRunId, {
+    questRunId,
+    questTemplateId: mission.questTemplateId,
+    questType: mission.questType,
+    state: "completed",
+    history: [...transitionComplete.history],
+    completedAt: new Date(occurredAtTime).toISOString(),
+  });
+
+  usedTokens.add(parsed.recordId);
+
+  return remember(requestKey, 201, {
+    ok: true,
+    questRun: { questRunId, questType: mission.questType, state: "completed" },
+    activity,
+    carbonResult,
+    ecoXpIssued: mission.ecoXp,
+    greenPointsIssued,
+  });
+}
+
+export async function getLeaderboard(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const timeframe = searchParams.get("timeframe") || "all-time";
+
+  const balances = deriveScoreBalances(scoreHistory);
+  const completed = [...runs.values()].filter((run) => run.state === "completed");
+
+  const playerPoints = balances.greenPoints;
+  const playerCarbon = Number(balances.avoidedKgCo2e);
+  const playerMissions = completed.length;
+
+  // Static cohort scores that scale based on timeframe
+  const rawCohort = [
+    { name: "NeonGlider", weekly: { points: 80, carbon: 6.2, missions: 4 }, monthly: { points: 340, carbon: 26.5, missions: 15 }, allTime: { points: 1200, carbon: 93.6, missions: 52 } },
+    { name: "EcoGhost_99", weekly: { points: 65, carbon: 5.0, missions: 3 }, monthly: { points: 280, carbon: 21.8, missions: 12 }, allTime: { points: 950, carbon: 74.1, missions: 41 } },
+    { name: "SolarMoth", weekly: { points: 50, carbon: 3.9, missions: 2 }, monthly: { points: 210, carbon: 16.4, missions: 9 }, allTime: { points: 720, carbon: 56.2, missions: 30 } },
+    { name: "QuietPedal", weekly: { points: 35, carbon: 2.7, missions: 2 }, monthly: { points: 150, carbon: 11.7, missions: 6 }, allTime: { points: 480, carbon: 37.4, missions: 20 } },
+    { name: "RootSystem", weekly: { points: 20, carbon: 1.5, missions: 1 }, monthly: { points: 90, carbon: 7.0, missions: 4 }, allTime: { points: 310, carbon: 24.2, missions: 13 } },
+    { name: "PaperKite", weekly: { points: 10, carbon: 0.8, missions: 1 }, monthly: { points: 45, carbon: 3.5, missions: 2 }, allTime: { points: 140, carbon: 10.9, missions: 6 } },
+    { name: "FirstStep", weekly: { points: 5, carbon: 0.4, missions: 1 }, monthly: { points: 20, carbon: 1.6, missions: 1 }, allTime: { points: 60, carbon: 4.7, missions: 2 } },
+  ];
+
+  const cohort = rawCohort.map((u) => {
+    const stats = timeframe === "weekly" ? u.weekly : timeframe === "monthly" ? u.monthly : u.allTime;
+    return {
+      name: u.name,
+      points: stats.points,
+      carbonSaved: stats.carbon,
+      missionsCompleted: stats.missions,
+      isPlayer: false,
+    };
+  });
+
+  const allRows = [
+    ...cohort,
+    {
+      name: "You",
+      points: playerPoints,
+      carbonSaved: playerCarbon,
+      missionsCompleted: playerMissions,
+      isPlayer: true,
+    },
+  ];
+
+  // Sort by points desc, then carbon desc
+  allRows.sort((a, b) => b.points - a.points || b.carbonSaved - a.carbonSaved || Number(a.isPlayer) - Number(b.isPlayer));
+
+  const rankedRows = allRows.map((row, index) => ({
+    rank: index + 1,
+    ...row,
+  }));
+
+  const playerPosition = rankedRows.findIndex((row) => row.isPlayer);
+
+  return response({
+    timeframe,
+    leaderboard: rankedRows,
+    playerPosition: playerPosition + 1,
+  });
+}
+

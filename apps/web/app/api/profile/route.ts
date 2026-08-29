@@ -30,11 +30,27 @@ export async function GET() {
         connected: profile.googleHealth.connected,
         connectedAt: profile.googleHealth.connectedAt,
         scope: profile.googleHealth.scope,
+        lastSyncedAt: profile.googleHealth.lastSyncedAt,
+        activityRecordsCount: profile.googleHealth.activityRecordsCount,
+        lastSyncedPeriod: profile.googleHealth.lastSyncedPeriod,
       }
     : { connected: false };
 
   return Response.json({
-    profile: profile ? { ...profile, googleHealth: safeGoogleHealth } : { displayName: auth.user.name, email: auth.user.email, googleHealth: safeGoogleHealth },
+    profile: profile
+      ? {
+          ...profile,
+          googleHealth: safeGoogleHealth,
+          trackingStarted: profile.trackingStarted ?? false,
+          demoMode: profile.demoMode ?? false,
+        }
+      : {
+          displayName: auth.user.name,
+          email: auth.user.email,
+          googleHealth: safeGoogleHealth,
+          trackingStarted: false,
+          demoMode: false,
+        },
     stats: {
       level: derived.level,
       levelTitle: derived.levelTitle,
@@ -54,6 +70,8 @@ const updateSchema = z.object({
     notifications: z.boolean().optional(),
     darkMode: z.boolean().optional(),
   }).optional(),
+  trackingStarted: z.boolean().optional(),
+  demoMode: z.boolean().optional(),
 });
 
 export async function PATCH(request: Request) {

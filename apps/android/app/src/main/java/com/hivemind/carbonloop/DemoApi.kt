@@ -29,4 +29,6 @@ class DemoRepository(private val http: DemoHttp = UrlConnectionDemoHttp()) {
     fun ledger() = http.request("GET", "scores/ledger")
     fun rewards() = http.request("GET", "rewards/catalogue")
     fun redeem() = write("rewards/redemptions", JSONObject().put("rewardItemId", "SYNTHETIC_TEST_ONLY_canteen_reward"))
+    fun leaderboard(timeframe: String) = http.request("GET", "leaderboard?timeframe=$timeframe")
+    fun syncActivity(payload: JSONObject, key: String) = http.request("POST", "health", payload.toString(), key)
 }

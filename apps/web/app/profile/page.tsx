@@ -8,8 +8,10 @@ import {
   CheckCircle2,
   Flame,
   Leaf,
+  Loader2,
   LogOut,
   Mail,
+  RefreshCw,
   Shield,
   Sparkles,
   Star,
@@ -24,8 +26,17 @@ type ProfileData = {
   profile: {
     displayName: string;
     email: string;
+    demoMode?: boolean;
     preferences: { notifications: boolean; darkMode: boolean };
-    googleHealth?: { connected: boolean; connectedAt?: string; scope?: string };
+    googleHealth?: {
+      connected: boolean;
+      connectedAt?: string;
+      scope?: string;
+      lastSyncedAt?: string;
+      activityRecordsCount?: number;
+      lastSyncedPeriod?: string;
+      carbonCalculated?: boolean;
+    };
   };
   stats: {
     level: number;
@@ -44,6 +55,8 @@ export default function ProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -63,6 +76,25 @@ export default function ProfilePage() {
   async function handleLogout() {
     await logout();
     router.push("/");
+  }
+
+  async function handleSync() {
+    setSyncing(true);
+    setSyncMessage(null);
+    try {
+      const res = await fetch("/api/health/sync", { method: "POST" });
+      const json = await res.json();
+      if (res.ok) {
+        setSyncMessage("Activity data synced!");
+        await fetchProfile();
+      } else {
+        setSyncMessage(json.message ?? "Sync failed.");
+      }
+    } catch {
+      setSyncMessage("Network error.");
+    } finally {
+      setSyncing(false);
+    }
   }
 
   if (authLoading || loading || !profile) {
@@ -113,8 +145,8 @@ export default function ProfilePage() {
             </div>
             <div className="stat">
               <dt><Leaf size={14} /> CO₂e Avoided</dt>
-              <dd>{Number(stats.avoidedKgCo2e).toFixed(3)} kg</dd>
-              <p>Evidence-based</p>
+              <dd>{profile.profile.googleHealth?.carbonCalculated ? `${Number(stats.avoidedKgCo2e).toFixed(3)} kg` : "0.000 kg"}</dd>
+              <p>{profile.profile.googleHealth?.carbonCalculated ? "Evidence-based" : "Not calculated"}</p>
             </div>
             <div className="stat">
               <dt><Target size={14} /> Missions</dt>
@@ -128,8 +160,37 @@ export default function ProfilePage() {
         <section className="block">
           <h2 className="block-title"><Activity size={18} /> Google Health & Fitness</h2>
           <p className="muted">
-            Connect Google Health to sync your step counts and activity data directly into CarbonLoop missions.
+            Connect Google Health to sync your step counts and activity data directly into CarbonLoop.
           </p>
+          {/* Demo Mode Toggle inside Google Health block */}
+          <div style={{ padding: "12px 14px", border: "1px dashed rgba(78, 222, 163, 0.3)", background: "rgba(78, 222, 163, 0.02)", borderRadius: 6, marginBottom: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: "bold", display: "flex", alignItems: "center", gap: 6 }}>
+                <Sparkles size={14} style={{ color: "var(--secondary)" }} /> Demo Mode
+              </p>
+              <p className="muted" style={{ margin: "2px 0 0", fontSize: 11 }}>
+                Simulate fitness syncing without real Google OAuth credentials.
+              </p>
+            </div>
+            <button
+              type="button"
+              className={profile.profile.demoMode ? "primary" : "secondary"}
+              onClick={async () => {
+                const enable = !profile.profile.demoMode;
+                await fetch("/api/profile", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ demoMode: enable }),
+                });
+                await fetchProfile();
+              }}
+              style={{ fontSize: 11, padding: "5px 10px" }}
+            >
+              {profile.profile.demoMode ? "Enabled" : "Disabled"}
+            </button>
+          </div>
+
+          {syncMessage && <p className="notice" role="alert" style={{ marginTop: 10 }}>{syncMessage}</p>}
           <div style={{ marginTop: 14 }}>
             {profile.profile.googleHealth?.connected ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -142,19 +203,35 @@ export default function ProfilePage() {
                     <p className="achievement-desc">
                       Scope: Activity/Fitness Read ({profile.profile.googleHealth.scope || "https://www.googleapis.com/auth/fitness.activity.read"})
                     </p>
+                    {profile.profile.googleHealth.lastSyncedAt && (
+                      <p className="achievement-desc" style={{ marginTop: 4 }}>
+                        Last Synced: {new Date(profile.profile.googleHealth.lastSyncedAt).toLocaleString()} ({profile.profile.googleHealth.activityRecordsCount ?? 0} records)
+                      </p>
+                    )}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="ghost"
-                  style={{ width: "fit-content", fontSize: 13 }}
-                  onClick={async () => {
-                    await fetch("/api/auth/google/disconnect", { method: "POST" });
-                    await fetchProfile();
-                  }}
-                >
-                  Disconnect Google Health
-                </button>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={syncing}
+                    onClick={handleSync}
+                    style={{ fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }}
+                  >
+                    {syncing ? <><Loader2 size={14} className="spin" /> Syncing…</> : <><RefreshCw size={14} /> Sync Activity Data</>}
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost"
+                    style={{ fontSize: 13 }}
+                    onClick={async () => {
+                      await fetch("/api/auth/google/disconnect", { method: "POST" });
+                      await fetchProfile();
+                    }}
+                  >
+                    Disconnect
+                  </button>
+                </div>
               </div>
             ) : (
               <a
