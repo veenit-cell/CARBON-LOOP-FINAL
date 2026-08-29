@@ -194,6 +194,19 @@ export function saveGoogleHealthConnection(
   return store.profiles[index];
 }
 
+export function disconnectGoogleHealth(userId: string): UserProfile | undefined {
+  const store = loadStore<ProfilesStore>("profiles", { profiles: [] });
+  const index = store.profiles.findIndex((p) => p.userId === userId);
+  if (index === -1) return undefined;
+
+  store.profiles[index].googleHealth = {
+    connected: false,
+  };
+
+  saveStore("profiles", store);
+  return store.profiles[index];
+}
+
 
 // ---------------------------------------------------------------------------
 // Session operations

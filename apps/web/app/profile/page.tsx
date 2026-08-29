@@ -132,16 +132,29 @@ export default function ProfilePage() {
           </p>
           <div style={{ marginTop: 14 }}>
             {profile.profile.googleHealth?.connected ? (
-              <div className="achievement earned" style={{ opacity: 1, padding: "14px 16px" }}>
-                <CheckCircle2 size={24} style={{ color: "var(--secondary)" }} />
-                <div>
-                  <p className="achievement-title" style={{ color: "var(--secondary)", fontSize: 14 }}>
-                    Google Health Connected
-                  </p>
-                  <p className="achievement-desc">
-                    Scope: Activity/Fitness Read ({profile.profile.googleHealth.scope || "https://www.googleapis.com/auth/fitness.activity.read"})
-                  </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div className="achievement earned" style={{ opacity: 1, padding: "14px 16px" }}>
+                  <CheckCircle2 size={24} style={{ color: "var(--secondary)" }} />
+                  <div>
+                    <p className="achievement-title" style={{ color: "var(--secondary)", fontSize: 14 }}>
+                      Google Health Connected
+                    </p>
+                    <p className="achievement-desc">
+                      Scope: Activity/Fitness Read ({profile.profile.googleHealth.scope || "https://www.googleapis.com/auth/fitness.activity.read"})
+                    </p>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  className="ghost"
+                  style={{ width: "fit-content", fontSize: 13 }}
+                  onClick={async () => {
+                    await fetch("/api/auth/google/disconnect", { method: "POST" });
+                    await fetchProfile();
+                  }}
+                >
+                  Disconnect Google Health
+                </button>
               </div>
             ) : (
               <a
