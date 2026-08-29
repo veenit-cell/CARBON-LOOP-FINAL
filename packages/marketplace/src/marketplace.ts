@@ -3,13 +3,19 @@ import { z } from "zod";
 
 export const MOCK_DEMO_ONLY = "MOCK_DEMO_ONLY" as const;
 export const greenPointsClassificationSchema = z.literal("non_cash_loyalty_points");
-export const mockCanteenRewardSchema = z.object({
+export const mockRewardSchema = z.object({
   rewardItemId: opaqueIdSchema,
-  title: z.literal("SYNTHETIC_TEST_ONLY Mock Canteen Reward"),
+  title: z.string().trim().min(1),
+  blurb: z.string().trim().min(1),
   greenPointsCost: z.number().int().positive(),
   catalogueLabel: z.literal(MOCK_DEMO_ONLY),
   fulfilmentLabel: z.literal(MOCK_DEMO_ONLY),
   classification: greenPointsClassificationSchema,
+});
+export type MockReward = z.infer<typeof mockRewardSchema>;
+
+export const mockCanteenRewardSchema = mockRewardSchema.extend({
+  title: z.literal("SYNTHETIC_TEST_ONLY Mock Canteen Reward"),
 });
 export type MockCanteenReward = z.infer<typeof mockCanteenRewardSchema>;
 
@@ -69,8 +75,44 @@ export function appendRedemptionEvent(history: readonly RedemptionEvent[], rawEv
 export const seededMockCanteenReward: MockCanteenReward = {
   rewardItemId: "SYNTHETIC_TEST_ONLY_canteen_reward",
   title: "SYNTHETIC_TEST_ONLY Mock Canteen Reward",
+  blurb: "A simulated canteen voucher. No payment, delivery, or cash value occurs.",
   greenPointsCost: 10,
   catalogueLabel: MOCK_DEMO_ONLY,
   fulfilmentLabel: MOCK_DEMO_ONLY,
   classification: "non_cash_loyalty_points",
 };
+
+/**
+ * Mock-only catalogue. Costs are the reward-pacing knob: they sit against
+ * `syntheticDemoConversionRate`, so retune both together.
+ */
+export const seededMockRewardCatalogue: readonly MockReward[] = [
+  seededMockCanteenReward,
+  {
+    rewardItemId: "SYNTHETIC_TEST_ONLY_bottle_reward",
+    title: "SYNTHETIC_TEST_ONLY Mock Reusable Bottle",
+    blurb: "A simulated campus-store bottle. Nothing is shipped or charged.",
+    greenPointsCost: 45,
+    catalogueLabel: MOCK_DEMO_ONLY,
+    fulfilmentLabel: MOCK_DEMO_ONLY,
+    classification: "non_cash_loyalty_points",
+  },
+  {
+    rewardItemId: "SYNTHETIC_TEST_ONLY_library_reward",
+    title: "SYNTHETIC_TEST_ONLY Mock Library Late-Fee Waiver",
+    blurb: "A simulated fee waiver. No institutional system is contacted.",
+    greenPointsCost: 90,
+    catalogueLabel: MOCK_DEMO_ONLY,
+    fulfilmentLabel: MOCK_DEMO_ONLY,
+    classification: "non_cash_loyalty_points",
+  },
+  {
+    rewardItemId: "SYNTHETIC_TEST_ONLY_tree_reward",
+    title: "SYNTHETIC_TEST_ONLY Mock Campus Tree Plaque",
+    blurb: "A simulated plaque. No tree is planted and no offset or carbon credit is created.",
+    greenPointsCost: 200,
+    catalogueLabel: MOCK_DEMO_ONLY,
+    fulfilmentLabel: MOCK_DEMO_ONLY,
+    classification: "non_cash_loyalty_points",
+  },
+];

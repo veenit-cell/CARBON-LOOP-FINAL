@@ -1,1 +1,2 @@
-import { progress } from "@/lib/demo-api"; export const GET = progress;
+import { progress } from "@/lib/demo-api";
+export const GET = progress;

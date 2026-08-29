@@ -6,6 +6,11 @@ export const playerProfileSchema = z.object({ playerId: opaqueIdSchema, displayN
 export const campusMembershipSchema = z.object({ campusId: opaqueIdSchema, playerId: opaqueIdSchema, role: roleSchema, validFrom: isoTimestampSchema });
 export const consentEventSchema = z.object({ consentId: opaqueIdSchema, playerId: opaqueIdSchema, purpose: z.enum(["account", "activity", "route", "evidence", "social", "institutional_aggregation", "research"]), action: z.enum(["granted", "withdrawn"]), policyVersion: z.string().min(1), occurredAt: isoTimestampSchema });
 
+/** Playable mission types. Shared so the quest engine and scoring ledger cannot drift apart. */
+export const gameQuestTypeSchema = z.enum(["walk_instead_of_ride", "cycle_instead_of_ride", "shuttle_journey", "zero_waste_meal"]);
+/** Activity types a mission can record. `consumption` carries no avoided-CO2e claim. */
+export const gameActivityTypeSchema = z.enum(["walking", "cycling", "shuttle", "consumption"]);
+
 export const trackingModeSchema = z.enum(["passive_suggestion", "active_challenge", "issuer_verified", "document_based", "manual"]);
 export const missionRequirementsSchema = z.object({ trackingMode: trackingModeSchema, requiredConsentPurposes: z.array(consentEventSchema.shape.purpose), evidenceRequired: z.boolean() });
 export const questTemplateSchema = z.object({ questTemplateId: opaqueIdSchema, version: z.string().min(1), title: z.string().min(1), requirements: missionRequirementsSchema, status: z.enum(["draft", "published", "retired"]) });

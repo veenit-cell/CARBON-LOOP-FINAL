@@ -1,7 +1,7 @@
-import { isoTimestampSchema, opaqueIdSchema } from "@carbonloop/schemas";
+import { gameActivityTypeSchema, gameQuestTypeSchema, isoTimestampSchema, opaqueIdSchema } from "@carbonloop/schemas";
 import { z } from "zod";
 
-export const questTypeSchema = z.enum(["walk_instead_of_ride", "shuttle_journey"]);
+export const questTypeSchema = gameQuestTypeSchema;
 export const questStateSchema = z.enum(["available", "active", "paused", "completed", "rejected"]);
 
 export const questTransitionEventSchema = z.object({
@@ -103,4 +103,28 @@ export type SimulatedWalkingActivity = z.infer<typeof simulatedWalkingActivitySc
 export function simulateWalkingActivity(input: unknown): SimulatedWalkingActivity {
   const activity = simulatedWalkingInputSchema.parse(input);
   return { ...activity, adapterLabel: SIMULATED_DEMO_ONLY, activityType: "walking", quantityUnit: "km" };
+}
+
+export const simulatedActivityInputSchema = simulatedWalkingInputSchema.extend({
+  activityType: gameActivityTypeSchema,
+  /** `consumption` missions record no distance, so they carry no quantity unit. */
+  distanceKm: z.string().regex(/^\d+(?:\.\d+)?$/).optional(),
+});
+export const simulatedActivitySchema = simulatedActivityInputSchema.extend({
+  adapterLabel: z.literal(SIMULATED_DEMO_ONLY),
+  quantityUnit: z.enum(["km", "meal"]),
+});
+export type SimulatedActivity = z.infer<typeof simulatedActivitySchema>;
+
+/**
+ * Deterministic demo-only adapter for every playable activity type. It never reads
+ * sensors, permissions, or location; the caller supplies the simulated quantity.
+ */
+export function simulateActivity(input: unknown): SimulatedActivity {
+  const activity = simulatedActivityInputSchema.parse(input);
+  const distanceBased = activity.activityType !== "consumption";
+  if (distanceBased && activity.distanceKm === undefined) {
+    throw new Error("Distance-based activities require a simulated distanceKm.");
+  }
+  return { ...activity, adapterLabel: SIMULATED_DEMO_ONLY, quantityUnit: distanceBased ? "km" : "meal" };
 }

@@ -8,6 +8,7 @@ export {
   deriveStreak,
   deriveTeamContribution,
   eligibleMissionDaySchema,
+  greenPointsForAvoidedKgCo2e,
   missionCompletionSchema,
   scoreEventSchema,
   syntheticConversionRateSchema,
