@@ -4,8 +4,10 @@ export {
   deriveRedemptionState,
   greenPointsClassificationSchema,
   mockCanteenRewardSchema,
+  mockRewardSchema,
   redemptionEventSchema,
   redemptionStateSchema,
   seededMockCanteenReward,
+  seededMockRewardCatalogue,
 } from "./marketplace.js";
-export type { AppendRedemptionResult, MockCanteenReward, RedemptionEvent, RedemptionState } from "./marketplace.js";
+export type { AppendRedemptionResult, MockCanteenReward, MockReward, RedemptionEvent, RedemptionState } from "./marketplace.js";

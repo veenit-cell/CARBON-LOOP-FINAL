@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+# Installing @playwright/test otherwise downloads ~100 MB of browsers. `npm test`
+# is vitest only, and `npm run test:e2e` is deliberately not part of this gate.
+env:
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # package.json allows >=20.9.0, but this gate only exercises the version
+          # the work was verified on. Add a matrix if the floor needs proving too.
+          node-version: 24.x
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run format:check
+
+      # `npm test` runs a `pretest` hook that builds the workspace packages, and the
+      # `@carbonloop/*` exports maps point at ./dist. lint has no such hook, so it has
+      # to come after this step or eslint cannot resolve those imports.
+      - run: npm test
+
+      - run: npm run lint
+
+      - run: npm run typecheck
+
+      - run: npm run build

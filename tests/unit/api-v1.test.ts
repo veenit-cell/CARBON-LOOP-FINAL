@@ -1,24 +1,53 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { spawn, type ChildProcess } from "node:child_process";
+import { describe, expect, it } from "vitest";
 
-const baseUrl = "http://127.0.0.1:3103/api/v1";
-let server: ChildProcess;
+import { GET as campusOverview } from "@/app/api/v1/campus/overview/route";
+import { POST as demoReset } from "@/app/api/v1/demo/reset/route";
+import { POST as shuttleCheckin } from "@/app/api/v1/evidence/shuttle-checkin/route";
+import { GET as health } from "@/app/api/v1/health/route";
+import { GET as playerProgress } from "@/app/api/v1/player/progress/route";
+import { POST as completeRun } from "@/app/api/v1/quest-runs/[id]/complete/route";
+import { POST as createRun } from "@/app/api/v1/quest-runs/route";
+import { GET as questCatalogue } from "@/app/api/v1/quests/route";
+import { GET as rewardCatalogue } from "@/app/api/v1/rewards/catalogue/route";
+import { POST as redeemReward } from "@/app/api/v1/rewards/redemptions/route";
+import { GET as scoreLedger } from "@/app/api/v1/scores/ledger/route";
 
-async function waitForServer(): Promise<void> {
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    try {
-      const response = await fetch(`${baseUrl}/health`);
-      if (response.status < 500) return;
-    } catch {
-      // The server is still starting.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 250));
+/**
+ * The real route modules are called directly instead of through a spawned `next dev`.
+ * Next 16 allows one dev server per project directory, so spawning one made `npm test`
+ * fail outright for anyone who already had a dev server open. Mapping a URL path to a
+ * route file is framework behaviour that `next build` proves; every line of this
+ * project's own request handling still runs below.
+ */
+const routes: Record<string, (request: Request) => Promise<Response>> = {
+  "/campus/overview": campusOverview,
+  "/demo/reset": demoReset,
+  "/evidence/shuttle-checkin": shuttleCheckin,
+  "/health": health,
+  "/player/progress": playerProgress,
+  "/quest-runs": createRun,
+  "/quests": questCatalogue,
+  "/rewards/catalogue": rewardCatalogue,
+  "/rewards/redemptions": redeemReward,
+  "/scores/ledger": scoreLedger,
+};
+
+const completePath = /^\/quest-runs\/([^/]+)\/complete$/;
+
+function dispatch(path: string, init?: RequestInit): Promise<Response> {
+  const httpRequest = new Request(`http://demo.test/api/v1${path}`, init);
+  const match = completePath.exec(path);
+  if (match !== null) {
+    const [, questRunId = ""] = match;
+    return completeRun(httpRequest, { params: Promise.resolve({ id: questRunId }) });
   }
-  throw new Error("Next.js test server did not start");
+  const handler = routes[path];
+  if (handler === undefined) throw new Error(`The test harness has no route registered for ${path}.`);
+  return handler(httpRequest);
 }
 
 async function request(path: string, init?: RequestInit) {
-  const response = await fetch(`${baseUrl}${path}`, init);
+  const response = await dispatch(path, init);
   return { response, body: await response.json() };
 }
 
@@ -37,16 +66,6 @@ function expectTruthLabels(value: unknown): void {
   expect((value as { truthLabels: string[] }).truthLabels.length).toBeGreaterThan(0);
 }
 
-beforeAll(async () => {
-  server = spawn(process.execPath, ["../../node_modules/next/dist/bin/next", "dev", "--port", "3103"], {
-    cwd: "apps/web",
-    stdio: "ignore",
-  });
-  await waitForServer();
-}, 20_000);
-
-afterAll(() => server?.kill());
-
 describe("Fast-Track Batch 3 demo API", () => {
   it("restores a deterministic demo-only seed", async () => { const before = await request("/scores/ledger"); await request("/quest-runs", { method: "POST", headers: headers("seed-mutation"), body: JSON.stringify({ questTemplateId: "SIMULATED_DEMO_ONLY_walk_quest" }) }); const result = await reset("seed-reset"); const after = await request("/scores/ledger"); expect(result.body).toMatchObject({ reset: "SIMULATED_DEMO_ONLY", persistence: expect.stringContaining("not production") }); expect(after.body.events).toEqual(before.body.events); expectTruthLabels(result.body); });
   it("makes repeated demo resets idempotent", async () => { await reset("repeat-reset"); await request("/quest-runs", { method: "POST", headers: headers("repeat-mutation"), body: JSON.stringify({ questTemplateId: "SIMULATED_DEMO_ONLY_walk_quest" }) }); const repeated = await reset("repeat-reset"); const ledger = await request("/scores/ledger"); expect(repeated.response.status).toBe(200); expect(ledger.body.events).toHaveLength(1); });
@@ -57,7 +76,19 @@ describe("Fast-Track Batch 3 demo API", () => {
     expect(health.body.status).toBe("ok");
     expectTruthLabels(health.body);
     expect(quests.response.status).toBe(200);
-    expect(quests.body.quests).toHaveLength(2);
+    // The playable catalogue, not a fixed pair. Each entry must state up front whether
+    // it claims avoided CO2e, so a client cannot advertise points the mission never pays.
+    expect(quests.body.quests.length).toBeGreaterThanOrEqual(2);
+    for (const quest of quests.body.quests) {
+      expect(quest).toMatchObject({
+        questTemplateId: expect.stringContaining("SIMULATED_DEMO_ONLY"),
+        title: expect.any(String),
+        type: expect.any(String),
+        ecoXp: expect.any(Number),
+        claimsAvoidedCo2e: expect.any(Boolean),
+      });
+    }
+    expect(quests.body.quests.some((quest: { claimsAvoidedCo2e: boolean }) => !quest.claimsAvoidedCo2e)).toBe(true);
     expectTruthLabels(quests.body);
   });
 

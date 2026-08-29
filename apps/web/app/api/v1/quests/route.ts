@@ -1,1 +1,2 @@
-import { quests } from "@/lib/demo-api"; export const GET = quests;
+import { quests } from "@/lib/demo-api";
+export const GET = quests;

@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "workspaces": [
     "apps/web",
     "packages/schemas",
@@ -13,20 +16,27 @@
     "packages/marketplace"
   ],
   "scripts": {
+    "//build:packages": "This order is topological, not alphabetical: every package's exports map points at ./dist, so a dependency must be built before whatever imports it. schemas -> factor-registry -> carbon-engine -> scoring is the deepest chain. Reordering it breaks a clean checkout while leaving a warm one working, because stale dist output hides the failure locally. npm ignores keys beginning with //.",
+    "build:packages": "npm run build --workspace=@carbonloop/schemas --workspace=@carbonloop/factor-registry --workspace=@carbonloop/marketplace --workspace=@carbonloop/quest-engine --workspace=@carbonloop/carbon-engine --workspace=@carbonloop/scoring",
+    "test:packages": "npm run test --workspace=@carbonloop/schemas --workspace=@carbonloop/factor-registry --workspace=@carbonloop/marketplace --workspace=@carbonloop/quest-engine --workspace=@carbonloop/carbon-engine --workspace=@carbonloop/scoring",
+    "predev": "npm run build:packages",
     "dev": "npm --workspace=@carbonloop/web run dev",
+    "prebuild": "npm run build:packages",
     "build": "npm --workspace=@carbonloop/web run build",
     "start": "npm --workspace=@carbonloop/web run start",
     "lint": "npm --workspace=@carbonloop/web run lint",
     "format": "npm --workspace=@carbonloop/web run format",
     "format:check": "npm --workspace=@carbonloop/web run format:check",
+    "pretypecheck": "npm run build:packages",
     "typecheck": "npm --workspace=@carbonloop/web run typecheck",
-    "test": "vitest run --config vitest.config.ts",
+    "pretest": "npm run build:packages",
+    "test": "npm run test:packages && vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
     "test:e2e": "playwright test"
   },
   "devDependencies": {
-    "@playwright/test": "latest",
-    "@vitest/coverage-v8": "latest",
-    "vitest": "latest"
+    "@playwright/test": "^1.62.1",
+    "@vitest/coverage-v8": "^4.1.11",
+    "vitest": "^4.1.11"
   }
 }

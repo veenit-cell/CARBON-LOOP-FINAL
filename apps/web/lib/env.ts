@@ -1,9 +1,7 @@
 import { z } from "zod";
 
 export const environmentSchema = z.object({
-  NEXT_PUBLIC_APP_ENV: z
-    .enum(["local", "preview", "staging", "production"])
-    .default("local"),
+  NEXT_PUBLIC_APP_ENV: z.enum(["local", "preview", "staging", "production"]).default("local"),
   NEXT_PUBLIC_APP_URL: z.url().default("http://localhost:3000"),
 });
 

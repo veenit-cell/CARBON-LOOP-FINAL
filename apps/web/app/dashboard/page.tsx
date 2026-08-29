@@ -1,1 +1,5 @@
-import { Shell } from "@/components/DemoExperience"; export default function Page(){return <Shell dashboard/>}
+import { Shell } from "@/components/Shell";
+
+export default function Page() {
+  return <Shell dashboard />;
+}

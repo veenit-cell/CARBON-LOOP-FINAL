@@ -1,11 +1,33 @@
 import type { CarbonCalculationResult } from "@carbonloop/carbon-engine";
-import { evidenceTierSchema, isoTimestampSchema, opaqueIdSchema } from "@carbonloop/schemas";
+import { evidenceTierSchema, gameQuestTypeSchema, isoTimestampSchema, opaqueIdSchema } from "@carbonloop/schemas";
 import { z } from "zod";
 
 export const SYNTHETIC_TEST_ONLY = "SYNTHETIC_TEST_ONLY" as const;
-export const syntheticConversionRateSchema = z.object({ pointsPerKgCo2e: z.string().regex(/^\d+(?:\.\d+)?$/), dataLabel: z.literal(SYNTHETIC_TEST_ONLY) });
-export const syntheticDemoConversionRate = { pointsPerKgCo2e: "4", dataLabel: SYNTHETIC_TEST_ONLY } as const;
-export const missionCompletionSchema = z.object({ questRunId: opaqueIdSchema, questType: z.enum(["walk_instead_of_ride", "shuttle_journey"]), state: z.literal("completed"), completedAt: isoTimestampSchema });
+const DECIMAL_STRING = /^\d+(?:\.\d+)?$/;
+export const syntheticConversionRateSchema = z.object({ pointsPerKgCo2e: z.string().regex(DECIMAL_STRING), dataLabel: z.literal(SYNTHETIC_TEST_ONLY) });
+/**
+ * Green Points are `non_cash_loyalty_points`, so this rate is a game-balance knob and
+ * not a carbon claim. Tune it to change reward pacing; nothing else reads a literal rate.
+ */
+export const syntheticDemoConversionRate = { pointsPerKgCo2e: "40", dataLabel: SYNTHETIC_TEST_ONLY } as const;
+
+/** Whole Green Points for an avoided-CO2e string, floored. Returns 0 rather than inventing a point. */
+export function greenPointsForAvoidedKgCo2e(avoidedKgCo2e: string, rate = syntheticDemoConversionRate.pointsPerKgCo2e): number {
+  if (!DECIMAL_STRING.test(avoidedKgCo2e)) throw new Error("Avoided CO2e must be a non-negative decimal string.");
+  if (!DECIMAL_STRING.test(rate)) throw new Error("Conversion rate must be a non-negative decimal string.");
+  // Integer arithmetic throughout: Green Points are a spendable balance, so the
+  // conversion must never depend on how a decimal happens to land in a float.
+  const kg = asScaledInteger(avoidedKgCo2e);
+  const points = asScaledInteger(rate);
+  return Number((kg.units * points.units) / (kg.scale * points.scale));
+}
+
+function asScaledInteger(value: string): { units: bigint; scale: bigint } {
+  const [whole, fraction = ""] = value.split(".");
+  return { units: BigInt(whole + fraction), scale: 10n ** BigInt(fraction.length) };
+}
+
+export const missionCompletionSchema = z.object({ questRunId: opaqueIdSchema, questType: gameQuestTypeSchema, state: z.literal("completed"), completedAt: isoTimestampSchema });
 const eventBase = { eventId: opaqueIdSchema, questRunId: opaqueIdSchema, occurredAt: isoTimestampSchema, idempotencyKey: opaqueIdSchema };
 export const scoreEventSchema = z.discriminatedUnion("type", [
   z.object({ ...eventBase, type: z.literal("eco_xp_issued"), amount: z.number().int().positive(), mission: missionCompletionSchema }),
@@ -43,9 +65,30 @@ export function appendScoreEvent(history: readonly ScoreEvent[], rawEvent: unkno
 }
 
 export function canIssueGreenPoints(result: CarbonCalculationResult, activityType: string): boolean { return result.status === "calculated" && activityType !== "exercise" && ["V1", "V2"].includes(result.evidenceTier) && Number(result.avoidedKgCo2e) > 0; }
-export function deriveScoreBalances(history: readonly ScoreEvent[]): { ecoXp: number; greenPoints: number } {
-  validateScoreHistory(history); const amountsById = new Map(history.flatMap((event) => event.type === "eco_xp_issued" || event.type === "green_points_issued" ? [[event.eventId, event.amount] as const] : []));
-  return history.reduce((total, event) => { if (event.type === "eco_xp_issued") total.ecoXp += event.amount; if (event.type === "green_points_issued") total.greenPoints += event.amount; if (event.type === "eco_xp_reversed") total.ecoXp -= amountsById.get(event.reversalOfEventId) ?? 0; if (event.type === "green_points_reversed") total.greenPoints -= amountsById.get(event.reversalOfEventId) ?? 0; return total; }, { ecoXp: 0, greenPoints: 0 });
+const MICRO_KG = 1_000_000n;
+/** ponytail: fixed 6-decimal scale, matching the carbon engine's default rounding. Widen both together if precision ever needs to grow. */
+function toMicroKg(value: string): bigint {
+  const [whole, fraction = ""] = value.split(".");
+  return BigInt(whole) * MICRO_KG + BigInt(`${fraction}000000`.slice(0, 6));
+}
+function fromMicroKg(total: bigint): string {
+  const clamped = total > 0n ? total : 0n;
+  return `${clamped / MICRO_KG}.${(clamped % MICRO_KG).toString().padStart(6, "0")}`;
+}
+
+export function deriveScoreBalances(history: readonly ScoreEvent[]): { ecoXp: number; greenPoints: number; avoidedKgCo2e: string } {
+  validateScoreHistory(history);
+  const amountsById = new Map(history.flatMap((event) => event.type === "eco_xp_issued" || event.type === "green_points_issued" ? [[event.eventId, event.amount] as const] : []));
+  const avoidedById = new Map(history.flatMap((event) => event.type === "green_points_issued" ? [[event.eventId, toMicroKg(event.avoidedKgCo2e)] as const] : []));
+  let avoidedMicroKg = 0n;
+  const totals = history.reduce((total, event) => {
+    if (event.type === "eco_xp_issued") total.ecoXp += event.amount;
+    if (event.type === "green_points_issued") { total.greenPoints += event.amount; avoidedMicroKg += avoidedById.get(event.eventId) ?? 0n; }
+    if (event.type === "eco_xp_reversed") total.ecoXp -= amountsById.get(event.reversalOfEventId) ?? 0;
+    if (event.type === "green_points_reversed") { total.greenPoints -= amountsById.get(event.reversalOfEventId) ?? 0; avoidedMicroKg -= avoidedById.get(event.reversalOfEventId) ?? 0n; }
+    return total;
+  }, { ecoXp: 0, greenPoints: 0 });
+  return { ...totals, avoidedKgCo2e: fromMicroKg(avoidedMicroKg) };
 }
 export const SYNTHETIC_LEVEL_XP_THRESHOLD = 100;
 export function deriveLevel(lifetimeEcoXp: number): number { if (!Number.isInteger(lifetimeEcoXp) || lifetimeEcoXp < 0) throw new Error("Lifetime Eco XP must be a non-negative integer."); return 1 + Math.floor(lifetimeEcoXp / SYNTHETIC_LEVEL_XP_THRESHOLD); }
