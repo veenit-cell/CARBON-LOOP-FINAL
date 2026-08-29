@@ -16,12 +16,11 @@
     "packages/marketplace"
   ],
   "scripts": {
-    "//build:packages": "This order is topological, not alphabetical: every package's exports map points at ./dist, so a dependency must be built before whatever imports it. schemas -> factor-registry -> carbon-engine -> scoring is the deepest chain. Reordering it breaks a clean checkout while leaving a warm one working, because stale dist output hides the failure locally. npm ignores keys beginning with //.",
+    "//build:packages": "This order is topological, not alphabetical: every package's exports map points at ./dist, so a dependency must be built before whatever imports it. schemas -> factor-registry -> carbon-engine -> scoring is the deepest chain. Reordering it breaks a clean checkout while leaving a warm one working, because stale dist output hides the failure locally. npm ignores keys beginning with //. `build` has no prebuild here on purpose: it delegates to @carbonloop/web, whose own prebuild runs this, so hosts that build from apps/web directly are covered too.",
     "build:packages": "npm run build --workspace=@carbonloop/schemas --workspace=@carbonloop/factor-registry --workspace=@carbonloop/marketplace --workspace=@carbonloop/quest-engine --workspace=@carbonloop/carbon-engine --workspace=@carbonloop/scoring",
     "test:packages": "npm run test --workspace=@carbonloop/schemas --workspace=@carbonloop/factor-registry --workspace=@carbonloop/marketplace --workspace=@carbonloop/quest-engine --workspace=@carbonloop/carbon-engine --workspace=@carbonloop/scoring",
     "predev": "npm run build:packages",
     "dev": "npm --workspace=@carbonloop/web run dev",
-    "prebuild": "npm run build:packages",
     "build": "npm --workspace=@carbonloop/web run build",
     "start": "npm --workspace=@carbonloop/web run start",
     "lint": "npm --workspace=@carbonloop/web run lint",
